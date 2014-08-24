@@ -1,10 +1,11 @@
 # An Analysis of the Impact of Weather Events in the US
 
-This report is intended to be used by FEMA as it prepares for the annual strategic plan. While weather by its nature an unplanned event, we can certainly plan for the liklihood of a range of weather events occuring. There are many adverse impacts from weather that can require a response from the US Federal Government (specifically, FEMA). This document will serve to document the types of events that have the largest impact on human health and economic activity, and ensure FEMA gives these events the appropraite priority in planning.
+This report is intended to be used by FEMA as it prepares for the annual strategic plan. While weather by its nature an unplanned event, we can certainly plan for the likelihood of a range of weather events occurring. There are many adverse impacts from weather that can require a response from the US Federal Government (specifically, FEMA). This document will serve to document the types of events that have the largest impact on human health and economic activity, and ensure FEMA gives these events the appropriate priority in planning.
 
 ## Synopsis
-No more than 10 sent.
+Since 1950, NOAA has been collecting information on the impact of adverse weather in the United States and territories. This data can be used to ensure activities and preparation is aligned to the most likely need. Weather is unpredictable, but we know it can impact the United States and our citizens in two difficult ways: casualties (fatalities and injuries) and economic loss (crop damage and property damage). FEMA should have specific plans in place for response and (potentially) mitigation of the top weather events that contribute to those adverse effects of weather. 
 
+The analysis will show that from a health standpoint, tornados create the most casualties in the United States. From an economic standpoint, drought is the largest economically damaging weather for crops, and flooding is the cause of most economic damage for property.
 
 ## Data Processing
 This report explores the NOAA Storm Database to reach its conclusions. The background on the data can be [found online.](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
@@ -13,12 +14,14 @@ The first step in analysis is to load the data.
 
 ```{r loadData}
 library(plyr)
+library(ggplot2)
+library(gridExtra)
 dataDir <- "/home/rstudio/largedata/"
 dataFileURL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 if (!file.exists(paste(dataDir, "repdata-data-StormData.csv.bz2", sep=""))) {
     download.file(dataFileURL, destfile = paste(dataDir, "repdata-data-StormData.csv.bz2", sep=""), method="curl")
 }
-data <- read.csv(bzfile(paste(dataDir, "repdata-data-StormData.csv.bz2", sep="")), nrows=10000)
+data <- read.csv(bzfile(paste(dataDir, "repdata-data-StormData.csv.bz2", sep="")))
 ```
 
 For this analysis, we want to answer two data questions:
@@ -29,7 +32,7 @@ For this analysis, we want to answer two data questions:
 
 This is a fairly large dataset with `r nrow(data)` observations and `r ncol(data)` variables. Since we are going to focus attention on variables in the data that can help us answer those two questions above, let's remove unneeded variables. 
 
-The nature of the data questions allow us to make some simplyfying changes to the data
+The nature of the data questions allow us to make some simplifying changes to the data
 
 * The questions do not require us to answer how health or economic impacts change over time, so we can ignore date and time information. We will look at total impact for all dates in the set
 * The questions do not require us to answer how health or economic impacts change by geography, so we can ignore state and geo code information and look at all locations.
@@ -42,7 +45,7 @@ interestingVars <- c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP"
 data <- data[interestingVars]
 ```
 
-Now we have reduced the number of varibales to `r ncol(data)` which will help us manage the analysis. 
+Now we have reduced the number of variables to `r ncol(data)` which will help us manage the analysis. 
 
 Moving to the `EVTYPE` variable, we see there is a large number (`r length(unique(data$EVTYPE))`) of types. Likely there is need to clean this up. Right away, we see there is punctuation and other noise in the types, so we will remove punctuation and format all the values in lower case to make it easier to use.
 
@@ -102,23 +105,63 @@ The last bit of data processing is to create some aggregate data frames to show 
 
 For health impact, we are looking at the total number of fatalities and the total number of injuries for each weather event type. This will show a fairly direct impact to health of the US population. 
 
-```{r agg}
+```{r aggHealth}
 health <- ddply(data, .(EVTYPE), summarize, fatalities = sum(FATALITIES), injuries = sum(INJURIES))
 health <- arrange(health, desc(fatalities), desc(injuries))
+head(health, 10)
 ```
 
 To see if this data makes sense, we found that the `r health[which.max(health$fatalities),1]` type had the highest fatalities with a total of `r max(health$fatalities)`. Likewise the `r health[which.max(health$injuries),1]` type had the highest injuries with a total of `r max(health$injuries)`.
 
-`r head(health, 10)`
-
 ### Economic Impact
 For economic impact, we are looking at the total dollar value of damage done to crops and the total dollar value of damage done to property for each weather type. This will show a fairly direct impact to economic activity in the US.
 
+Economic impact data to property is stored in two variables. The `PROPDMG` variable contains the raw number, and the `PROPDMGEXP` stores the exponents data. But the exponent is not directly stored, nor is it consistent. Instead it is a factor variable like `m` or `M` for 'million'. These need to be translated to 10^6. The same is true for `CROPDMG` and `CROPDMGEXP`. 
+
+Valid text values for exponent are B (10^9), M|m (10^6), K|k (10^3) and H|h (10^2). Some exponent values are numeric, and those will be treated as exponents directly. Other values not described will be translated to 10^0, but these errors account for less than .003% of the data.
+
+```{r aggEcon}
+findExp <- function(exp) {
+    if (exp %in% c("b", "B")) return (9)
+    else if (exp %in% c("b", "B")) return (9)
+    else if (exp %in% c("m", "M")) return (6)
+    else if (exp %in% c("k", "K")) return (3)
+    else if (exp %in% c("h", "H")) return (2)
+    else if (exp %in% c("b", "B")) return (9)
+    else if (exp %in% c(0,1,2,3,4,5,6,7,8,9)) return (exp)
+    else return(0)
+}
+data$RealCropDamage <- data$CROPDMG * 10 ^ sapply(data$CROPDMGEXP, FUN=findExp)
+data$RealPropDamage <- data$PROPDMG * 10 ^ sapply(data$PROPDMGEXP, FUN=findExp)
+econ <- ddply(data, .(EVTYPE), summarize, crop = sum(RealCropDamage), prop = sum(RealPropDamage))
+econ <- arrange(econ, desc(prop), desc(crop))
+head(econ, 10)
+```
+
+To see if this data makes sense, we found that the `r econ[which.max(econ$crop),1]` type had the most crop economic impact with a total of $`r max(econ$crop)`. Likewise the `r econ[which.max(econ$prop),1]` type had the most property damage with a total of $`r max(econ$prop)`.
 
 ## Results
-There should be a section titled Results in which your results are presented.
 
-The analysis document must have at least one figure containing a plot.
+### Health Impact
 
-Your analyis must have no more than three figures. Figures may have multiple plots in them (i.e. panel plots), but there cannot be more than three figures total.
+FEMA planners would focus on the following weather events that have historically resulted in largest number of total fatalities and injuries in the United States:
 
+```{r healthPlot}
+fatalData <- head(arrange(health, desc(fatalities)), 10)
+injuryData <- head(arrange(health, desc(injuries)), 10)
+g1 <- ggplot(data = fatalData, aes(reorder(EVTYPE, fatalities), fatalities)) + geom_bar(stat="identity") + coord_flip() + theme_bw() + xlab("Weather Event")
+g2 <- ggplot(data = injuryData, aes(reorder(EVTYPE, injuries), injuries)) + geom_bar(stat="identity") + coord_flip() + theme_bw() + xlab("Weather Event")
+grid.arrange(g1, g2, main="Total Health Impact in the US (1950 - 2011)")
+```
+
+### Economic Impact
+
+FEMA planners would focus on the following weather events that have historically resulted in most damage to the United States economy:
+
+```{r econPlot}
+cropData <- head(arrange(econ, desc(crop)), 10)
+propData <- head(arrange(econ, desc(prop)), 10)
+g1 <- ggplot(data = cropData, aes(reorder(EVTYPE, crop), crop)) + geom_bar(stat="identity") + coord_flip() + theme_bw() + xlab("Weather Event") + ylab("Crop Damage")
+g2 <- ggplot(data = propData, aes(reorder(EVTYPE, prop), prop)) + geom_bar(stat="identity") + coord_flip() + theme_bw() + xlab("Weather Event") + ylab("Property Damage")
+grid.arrange(g1, g2, main="Total Economic Impact in the US (1950 - 2011)")
+```
