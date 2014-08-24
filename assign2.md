@@ -108,19 +108,7 @@ For health impact, we are looking at the total number of fatalities and the tota
 
 
 ```r
-health <- ddply(data, .(EVTYPE), summarize, fatalities = sum(FATALITIES),injuries = sum(INJURIES))
+health <- ddply(data, .(EVTYPE), summarize, fatalities = sum(FATALITIES), injuries = sum(INJURIES))
+health <- arrange(health, desc(fatalities), desc(injuries))
 ```
-
-To see if this data makes sense, we found that the tornado type had the highest fatalities with a total of 518. Likewise the tornado type had the highest injuries with a total of 7781.
-
-### Economic Impact
-For economic impact, we are looking at the total dollar value of damage done to crops and the total dollar value of damage done to property for each weather type. This will show a fairly direct impact to economic activity in the US.
-
-
-## Results
-There should be a section titled Results in which your results are presented.
-
-The analysis document must have at least one figure containing a plot.
-
-Your analyis must have no more than three figures. Figures may have multiple plots in them (i.e. panel plots), but there cannot be more than three figures total.
 

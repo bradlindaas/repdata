@@ -11,7 +11,7 @@ This report explores the NOAA Storm Database to reach its conclusions. The backg
 
 The first step in analysis is to load the data.
 
-```{r loadData, cache=TRUE}
+```{r loadData}
 library(plyr)
 dataDir <- "/home/rstudio/largedata/"
 dataFileURL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
@@ -104,9 +104,12 @@ For health impact, we are looking at the total number of fatalities and the tota
 
 ```{r agg}
 health <- ddply(data, .(EVTYPE), summarize, fatalities = sum(FATALITIES), injuries = sum(INJURIES))
+health <- arrange(health, desc(fatalities), desc(injuries))
 ```
 
 To see if this data makes sense, we found that the `r health[which.max(health$fatalities),1]` type had the highest fatalities with a total of `r max(health$fatalities)`. Likewise the `r health[which.max(health$injuries),1]` type had the highest injuries with a total of `r max(health$injuries)`.
+
+`r head(health, 10)`
 
 ### Economic Impact
 For economic impact, we are looking at the total dollar value of damage done to crops and the total dollar value of damage done to property for each weather type. This will show a fairly direct impact to economic activity in the US.

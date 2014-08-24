@@ -336,10 +336,14 @@ data$EVTYPE[grep(&quot;^summary&quot;, data$EVTYPE)] &lt;- c(&quot;summary&quot;
 
 <p>For health impact, we are looking at the total number of fatalities and the total number of injuries for each weather event type. This will show a fairly direct impact to health of the US population. </p>
 
-<pre><code class="r">health &lt;- ddply(data, .(EVTYPE), summarize, fatalities = sum(FATALITIES),injuries = sum(INJURIES))
+<pre><code class="r">health &lt;- ddply(data, .(EVTYPE), summarize, fatalities = sum(FATALITIES), injuries = sum(INJURIES))
 </code></pre>
 
-<p>To see if this data makes sense, we found that the tornado type had the highest fatalities with a total of 518. Likewise the tornado type had the highest injuries with a total of 7781.</p>
+<pre><code>## Error: could not find function &quot;ddply&quot;
+</code></pre>
+
+<pre><code class="r">#health &lt;- arrange(health, desc(fatalities), desc(injuries))
+</code></pre>
 
 <h3>Economic Impact</h3>
 
