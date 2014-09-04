@@ -12,10 +12,18 @@ This report explores the NOAA Storm Database to reach its conclusions. The backg
 
 The first step in analysis is to load the data.
 
-```{r loadData}
+
+```r
 library(plyr)
 library(ggplot2)
 library(gridExtra)
+```
+
+```
+## Loading required package: grid
+```
+
+```r
 dataDir <- "/home/rstudio/largedata/"
 dataFileURL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 if (!file.exists(paste(dataDir, "repdata-data-StormData.csv.bz2", sep=""))) {
@@ -30,7 +38,7 @@ For this analysis, we want to answer two data questions:
 
 2. Across the United States, which types of events have the greatest economic consequences?
 
-This is a fairly large dataset with `r nrow(data)` observations and `r ncol(data)` variables. Since we are going to focus attention on variables in the data that can help us answer those two questions above, let's remove unneeded variables. 
+This is a fairly large dataset with 902297 observations and 37 variables. Since we are going to focus attention on variables in the data that can help us answer those two questions above, let's remove unneeded variables. 
 
 The nature of the data questions allow us to make some simplifying changes to the data
 
@@ -40,20 +48,22 @@ The nature of the data questions allow us to make some simplifying changes to th
 
 Based on this, we subset the data to reduce the number of variables down to the ones needed to analysis
 
-```{r subset}
+
+```r
 interestingVars <- c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP",  "CROPDMG", "CROPDMGEXP")
 data <- data[interestingVars]
 ```
 
-Now we have reduced the number of variables to `r ncol(data)` which will help us manage the analysis. 
+Now we have reduced the number of variables to 7 which will help us manage the analysis. 
 
-Moving to the `EVTYPE` variable, we see there is a large number (`r length(unique(data$EVTYPE))`) of types. Likely there is need to clean this up. Right away, we see there is punctuation and other noise in the types, so we will remove punctuation and format all the values in lower case to make it easier to use.
+Moving to the `EVTYPE` variable, we see there is a large number (985) of types. Likely there is need to clean this up. Right away, we see there is punctuation and other noise in the types, so we will remove punctuation and format all the values in lower case to make it easier to use.
 
-```{r formatEVTYPE}
+
+```r
 data$EVTYPE <- gsub("[[:blank:][:punct:]+]", " ", tolower(data$EVTYPE))
 ```
 
-Doing that reduced the number of unique types to `r length(unique(data$EVTYPE))`.
+Doing that reduced the number of unique types to 874.
 
 Last, we see there are a significant number of types that need to consolidated into a single type. Please see the following consolidation chart
 
@@ -78,7 +88,8 @@ starts with summary | summary
 
 Running the code to consolidate using this table will reduce duplicates:
 
-```{r consolidateEVTYPE}
+
+```r
 data$EVTYPE[grep("tornado", data$EVTYPE)] <- c("tornado")
 data$EVTYPE[grep("blizzard", data$EVTYPE)] <- c("blizzard")
 data$EVTYPE[grep("^bitter wind chill", data$EVTYPE)] <- c("bitter wind chill")
@@ -97,7 +108,7 @@ data$EVTYPE[grep("^tstm", data$EVTYPE)] <- c("thunderstorm wind")
 data$EVTYPE[grep("^summary", data$EVTYPE)] <- c("summary")
 ```
 
-Doing that reduced the number of unique types to `r length(unique(data$EVTYPE))`. There may be additional opportunity to consolidate these types if other researchers wish to review the remaining types for redundancy.
+Doing that reduced the number of unique types to 549. There may be additional opportunity to consolidate these types if other researchers wish to review the remaining types for redundancy.
 
 The last bit of data processing is to create some aggregate data frames to show health and economic impacts.
 
@@ -105,13 +116,28 @@ The last bit of data processing is to create some aggregate data frames to show 
 
 For health impact, we are looking at the total number of fatalities and the total number of injuries for each weather event type. This will show a fairly direct impact to health of the US population. 
 
-```{r aggHealth}
+
+```r
 health <- ddply(data, .(EVTYPE), summarize, fatalities = sum(FATALITIES), injuries = sum(INJURIES))
 health <- arrange(health, desc(fatalities), desc(injuries))
 head(health, 10)
 ```
 
-To see if this data makes sense, we found that the `r health[which.max(health$fatalities),1]` type had the highest fatalities with a total of `r max(health$fatalities)`. Likewise the `r health[which.max(health$injuries),1]` type had the highest injuries with a total of `r max(health$injuries)`.
+```
+##               EVTYPE fatalities injuries
+## 1            tornado       5661    91407
+## 2     excessive heat       1903     6525
+## 3        flash flood       1018     1785
+## 4               heat        937     2100
+## 5          lightning        817     5232
+## 6  thunderstorm wind        709     9458
+## 7              flood        470     6789
+## 8        rip current        368      232
+## 9          high wind        293     1471
+## 10         avalanche        224      170
+```
+
+To see if this data makes sense, we found that the tornado type had the highest fatalities with a total of 5661. Likewise the tornado type had the highest injuries with a total of 9.1407 &times; 10<sup>4</sup>.
 
 ### Economic Impact
 For economic impact, we are looking at the total dollar value of damage done to crops and the total dollar value of damage done to property for each weather type. This will show a fairly direct impact to economic activity in the US.
@@ -120,7 +146,8 @@ Economic impact data to property is stored in two variables. The `PROPDMG` varia
 
 Valid text values for exponent are B (10^9), M|m (10^6), K|k (10^3) and H|h (10^2). Some exponent values are numeric, and those will be treated as exponents directly. Other values not described will be translated to 10^0, but these errors account for less than .003% of the data.
 
-```{r aggEcon}
+
+```r
 findExp <- function(exp) {
     if (exp %in% c("b", "B")) return (9)
     else if (exp %in% c("b", "B")) return (9)
@@ -138,7 +165,21 @@ econ <- arrange(econ, desc(prop), desc(crop))
 head(econ, 10)
 ```
 
-To see if this data makes sense, we found that the `r econ[which.max(econ$crop),1]` type had the most crop economic impact with a total of $`r max(econ$crop)`. Likewise the `r econ[which.max(econ$prop),1]` type had the most property damage with a total of $`r max(econ$prop)`.
+```
+##               EVTYPE      crop      prop
+## 1        flash flood 1.437e+09 6.835e+12
+## 2  thunderstorm wind 1.224e+09 2.096e+12
+## 3            tornado 4.175e+08 1.608e+11
+## 4              flood 5.662e+09 1.447e+11
+## 5          hurricane 5.515e+09 8.476e+10
+## 6               hail 3.026e+09 4.598e+10
+## 7        storm surge 5.000e+03 4.332e+10
+## 8          lightning 1.209e+07 1.814e+10
+## 9     tropical storm 6.783e+08 7.704e+09
+## 10      winter storm 2.694e+07 6.689e+09
+```
+
+To see if this data makes sense, we found that the drought type had the most crop economic impact with a total of $1.3973 &times; 10<sup>10</sup>. Likewise the flash flood type had the most property damage with a total of $6.8354 &times; 10<sup>12</sup>.
 
 ## Results
 
@@ -146,7 +187,8 @@ To see if this data makes sense, we found that the `r econ[which.max(econ$crop),
 
 FEMA planners would focus on the following weather events that have historically resulted in largest number of total fatalities and injuries in the United States:
 
-```{r healthPlot}
+
+```r
 fatalData <- head(arrange(health, desc(fatalities)), 10)
 injuryData <- head(arrange(health, desc(injuries)), 10)
 g1 <- ggplot(data = fatalData, aes(reorder(EVTYPE, fatalities), fatalities)) + geom_bar(stat="identity") + coord_flip() + theme_bw() + xlab("Weather Event")
@@ -154,14 +196,19 @@ g2 <- ggplot(data = injuryData, aes(reorder(EVTYPE, injuries), injuries)) + geom
 grid.arrange(g1, g2, main="Figure 1: Total Health Impact in the US (1950 - 2011)")
 ```
 
+![plot of chunk healthPlot](figure/healthPlot.png) 
+
 ### Economic Impact
 
 FEMA planners would focus on the following weather events that have historically resulted in most damage to the United States economy:
 
-```{r econPlot}
+
+```r
 cropData <- head(arrange(econ, desc(crop)), 10)
 propData <- head(arrange(econ, desc(prop)), 10)
 g1 <- ggplot(data = cropData, aes(reorder(EVTYPE, crop), crop)) + geom_bar(stat="identity") + coord_flip() + theme_bw() + xlab("Weather Event") + ylab("Crop Damage")
 g2 <- ggplot(data = propData, aes(reorder(EVTYPE, prop), prop)) + geom_bar(stat="identity") + coord_flip() + theme_bw() + xlab("Weather Event") + ylab("Property Damage")
 grid.arrange(g1, g2, main="Figure 2: Total Economic Impact in the US (1950 - 2011)")
 ```
+
+![plot of chunk econPlot](figure/econPlot.png) 
